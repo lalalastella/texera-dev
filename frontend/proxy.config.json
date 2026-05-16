@@ -10,6 +10,16 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/api/fix-operator": {
+    "target": "http://localhost:3001",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/api/healthcheck": {
+    "target": "http://localhost:3001",
+    "secure": false,
+    "changeOrigin": true
+  },
 "/api/models": {
     "target": "http://localhost:9096",
     "secure": false,

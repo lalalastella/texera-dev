@@ -20,6 +20,7 @@
 import { Elysia, t } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
 import { TexeraAgent } from "./agent/texera-agent";
 import { getBackendConfig } from "./api/backend-api";
 import { extractUserFromToken, validateToken } from "./api/auth-api";
@@ -474,6 +475,18 @@ function broadcastToAgent(agentId: string, message: WsOutgoingMessage): void {
   }
 }
 
+async function getFirstAvailableModel(modelsEndpoint: string): Promise<string> {
+  try {
+    const response = await fetch(`${modelsEndpoint}/api/models`, {
+      headers: { Authorization: `Bearer ${env.LLM_API_KEY}` },
+    });
+    const data: any = await response.json();
+    return data?.data?.[0]?.id ?? "gpt-4o-mini";
+  } catch {
+    return "gpt-4o-mini";
+  }
+}
+
 export function buildApp() {
   return new Elysia()
     .use(cors())
@@ -483,6 +496,66 @@ export function buildApp() {
           status: "ok",
           timestamp: new Date().toISOString(),
         }))
+        .post(
+          "/fix-operator",
+          async ({ body, set }) => {
+            const { error, operatorType, operatorProperties, modelType } = body;
+
+            const config = getBackendConfig();
+            const resolvedModel = modelType || (await getFirstAvailableModel(config.modelsEndpoint));
+
+            const openai = createOpenAI({
+              baseURL: `${config.modelsEndpoint}/api`,
+              apiKey: env.LLM_API_KEY,
+            });
+
+            const prompt = `You are a Texera workflow debugging assistant.
+
+A workflow operator of type "${operatorType}" failed with this error:
+${error}
+
+The operator's current configuration is:
+${JSON.stringify(operatorProperties, null, 2)}
+
+Analyze the error and respond with a JSON object in this exact format:
+{
+  "explanation": "A clear, concise explanation of what went wrong and why",
+  "fix": { ...only the properties that need to change, with their corrected values... }
+}
+
+If no operator config change can fix the error, set "fix" to null.
+Respond with only the JSON object, no other text.`;
+
+            try {
+              const result = await generateText({
+                model: openai.chat(resolvedModel),
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.1,
+              });
+
+              const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+              if (!jsonMatch) {
+                return { explanation: result.text, fix: null };
+              }
+              const parsed = JSON.parse(jsonMatch[0]);
+              return {
+                explanation: parsed.explanation ?? result.text,
+                fix: parsed.fix ?? null,
+              };
+            } catch (e: any) {
+              set.status = 500;
+              return { error: e.message ?? String(e) };
+            }
+          },
+          {
+            body: t.Object({
+              error: t.String(),
+              operatorType: t.String(),
+              operatorProperties: t.Any(),
+              modelType: t.Optional(t.String()),
+            }),
+          }
+        )
         .use(agentsRouter)
     )
     .ws(`${env.API_PREFIX}/agents/:id/react`, {
