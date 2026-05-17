@@ -64,6 +64,52 @@
   </ul>
 </nz-dropdown-menu>
 
+<div
+  *ngIf="latestConsoleError()"
+  class="console-fix-ai-section">
+  <button
+    nz-button
+    nzSize="small"
+    nzType="primary"
+    *ngIf="!fixState"
+    (click)="fixConsoleErrorWithAI()">
+    <i
+      nz-icon
+      nzType="tool"
+      nzTheme="outline"></i>
+    Fix with AI
+  </button>
+
+  <nz-spin
+    *ngIf="fixState?.loading"
+    nzSimple
+    nzSize="small"></nz-spin>
+
+  <div *ngIf="fixState as state">
+    <nz-alert
+      *ngIf="state.error"
+      nzType="error"
+      [nzMessage]="state.error"></nz-alert>
+
+    <div
+      *ngIf="state.result"
+      class="fix-result">
+      <p class="fix-explanation">{{ state.result.explanation }}</p>
+      <div *ngIf="state.result.fix">
+        <p class="fix-label">Suggested config changes:</p>
+        <pre class="fix-diff">{{ state.result.fix | json }}</pre>
+        <button
+          nz-button
+          nzSize="small"
+          nzType="primary"
+          (click)="applyConsoleFix()">
+          Apply Fix
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <nz-list
   nzSize="small"
   class="console-list-container"

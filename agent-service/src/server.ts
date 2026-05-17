@@ -44,6 +44,21 @@ import { OperatorResultSerializationMode } from "./types/agent";
 const agentStore = new Map<string, TexeraAgent>();
 let agentCounter = 0;
 
+function getOpenAIBaseURL(modelsEndpoint: string): string {
+  const endpoint = modelsEndpoint.replace(/\/$/, "");
+  if (endpoint.endsWith("/api") || endpoint.endsWith("/v1")) {
+    return endpoint;
+  }
+  if (endpoint.includes("litellm")) {
+    return `${endpoint}/v1`;
+  }
+  return `${endpoint}/api`;
+}
+
+function getModelsURL(modelsEndpoint: string): string {
+  return `${getOpenAIBaseURL(modelsEndpoint)}/models`;
+}
+
 async function createAgentInstance(
   modelType: string,
   customName?: string,
@@ -53,7 +68,7 @@ async function createAgentInstance(
   const config = getBackendConfig();
 
   const openai = createOpenAI({
-    baseURL: `${config.modelsEndpoint}/api`,
+    baseURL: getOpenAIBaseURL(config.modelsEndpoint),
     apiKey: env.LLM_API_KEY,
   });
 
@@ -477,7 +492,7 @@ function broadcastToAgent(agentId: string, message: WsOutgoingMessage): void {
 
 async function getFirstAvailableModel(modelsEndpoint: string): Promise<string> {
   try {
-    const response = await fetch(`${modelsEndpoint}/api/models`, {
+    const response = await fetch(getModelsURL(modelsEndpoint), {
       headers: { Authorization: `Bearer ${env.LLM_API_KEY}` },
     });
     const data: any = await response.json();
@@ -505,7 +520,7 @@ export function buildApp() {
             const resolvedModel = modelType || (await getFirstAvailableModel(config.modelsEndpoint));
 
             const openai = createOpenAI({
-              baseURL: `${config.modelsEndpoint}/api`,
+              baseURL: getOpenAIBaseURL(config.modelsEndpoint),
               apiKey: env.LLM_API_KEY,
             });
 

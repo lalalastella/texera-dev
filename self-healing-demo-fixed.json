@@ -1,0 +1,93 @@
+{
+  "operators": [
+    {
+      "operatorID": "CSVFileScan-operator-8368246c-beb4-4aba-9456-591457788518",
+      "operatorType": "CSVFileScan",
+      "operatorVersion": "N/A",
+      "operatorProperties": {
+        "fileEncoding": "UTF_8",
+        "customDelimiter": ",",
+        "hasHeader": true,
+        "fileName": "/texera/database-demo/v1 - 1.0/self-healing-demo.csv"
+      },
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "portID": "output-0",
+          "displayName": "",
+          "disallowMultiInputs": false,
+          "isDynamicPort": false
+        }
+      ],
+      "showAdvanced": false,
+      "isDisabled": false,
+      "customDisplayName": "CSV File Scan",
+      "dynamicInputPorts": false,
+      "dynamicOutputPorts": false
+    },
+    {
+      "operatorID": "Filter-operator-fe0506f7-2272-48bf-b86d-c034e4959880",
+      "operatorType": "Filter",
+      "operatorVersion": "N/A",
+      "operatorProperties": {
+        "predicates": [
+          {
+            "attribute": "age",
+            "condition": ">",
+            "value": "30"
+          }
+        ]
+      },
+      "inputPorts": [
+        {
+          "portID": "input-0",
+          "displayName": "",
+          "disallowMultiInputs": false,
+          "isDynamicPort": false,
+          "dependencies": []
+        }
+      ],
+      "outputPorts": [
+        {
+          "portID": "output-0",
+          "displayName": "",
+          "disallowMultiInputs": false,
+          "isDynamicPort": false
+        }
+      ],
+      "showAdvanced": false,
+      "isDisabled": false,
+      "customDisplayName": "Filter",
+      "dynamicInputPorts": false,
+      "dynamicOutputPorts": false
+    }
+  ],
+  "operatorPositions": {
+    "CSVFileScan-operator-8368246c-beb4-4aba-9456-591457788518": {
+      "x": 356.95,
+      "y": 161.45
+    },
+    "Filter-operator-fe0506f7-2272-48bf-b86d-c034e4959880": {
+      "x": 560,
+      "y": 161.45
+    }
+  },
+  "links": [
+    {
+      "linkID": "link-6ac802e2-3e0a-4352-9450-56517a71cb87",
+      "source": {
+        "operatorID": "CSVFileScan-operator-8368246c-beb4-4aba-9456-591457788518",
+        "portID": "output-0"
+      },
+      "target": {
+        "operatorID": "Filter-operator-fe0506f7-2272-48bf-b86d-c034e4959880",
+        "portID": "input-0"
+      }
+    }
+  ],
+  "commentBoxes": [],
+  "settings": {
+    "dataTransferBatchSize": 400,
+    "executionMode": "PIPELINED"
+  }
+}

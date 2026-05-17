@@ -117,6 +117,40 @@
   }
 }
 
+.console-fix-ai-section {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid #d9e7ff;
+  border-radius: 4px;
+  background: #f7fbff;
+
+  .fix-result {
+    margin-top: 8px;
+  }
+
+  .fix-explanation {
+    margin: 0 0 6px;
+    color: #333;
+  }
+
+  .fix-label {
+    margin: 0 0 4px;
+    font-weight: 600;
+  }
+
+  .fix-diff {
+    max-height: 160px;
+    margin: 0 0 8px;
+    padding: 8px;
+    overflow: auto;
+    border: 1px solid #e8e8e8;
+    border-radius: 3px;
+    background: #fff;
+    font-size: 11px;
+  }
+}
+
 .console-input-container {
   flex: 0 0 auto;
   width: 100%;

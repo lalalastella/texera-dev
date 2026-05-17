@@ -18,10 +18,12 @@
  */
 
 import { Component, ElementRef, Input, OnChanges, OnInit, SimpleChanges, ViewChild } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
 import { ExecuteWorkflowService } from "../../../service/execute-workflow/execute-workflow.service";
 import { ConsoleMessage } from "../../../types/workflow-common.interface";
 import { ExecutionState } from "src/app/workspace/types/execute-workflow.interface";
 import { WorkflowConsoleService } from "../../../service/workflow-console/workflow-console.service";
+import { WorkflowActionService } from "../../../service/workflow-graph/model/workflow-action.service";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { CdkVirtualScrollViewport } from "@angular/cdk/scrolling";
 import { presetPalettes } from "@ant-design/colors";
@@ -36,7 +38,7 @@ import { NzMenuDirective, NzMenuItemComponent } from "ng-zorro-antd/menu";
 import { NzSwitchComponent } from "ng-zorro-antd/switch";
 import { FormsModule } from "@angular/forms";
 import { NzListComponent, NzListItemComponent } from "ng-zorro-antd/list";
-import { NgFor, NgIf, DatePipe } from "@angular/common";
+import { NgFor, NgIf, DatePipe, JsonPipe } from "@angular/common";
 import { NzRowDirective, NzColDirective } from "ng-zorro-antd/grid";
 import { NzBadgeComponent } from "ng-zorro-antd/badge";
 import { NzCollapseComponent, NzCollapsePanelComponent } from "ng-zorro-antd/collapse";
@@ -47,6 +49,19 @@ import { NzButtonComponent } from "ng-zorro-antd/button";
 import { NzWaveDirective } from "ng-zorro-antd/core/wave";
 import { NzTooltipDirective } from "ng-zorro-antd/tooltip";
 import { NzSelectComponent, NzOptionComponent } from "ng-zorro-antd/select";
+import { NzSpinComponent } from "ng-zorro-antd/spin";
+import { NzAlertComponent } from "ng-zorro-antd/alert";
+
+interface FixResult {
+  explanation: string;
+  fix: Record<string, any> | null;
+}
+
+interface FixState {
+  loading: boolean;
+  result?: FixResult;
+  error?: string;
+}
 
 @UntilDestroy()
 @Component({
@@ -81,7 +96,10 @@ import { NzSelectComponent, NzOptionComponent } from "ng-zorro-antd/select";
     NzInputDirective,
     NzSelectComponent,
     NzOptionComponent,
+    NzSpinComponent,
+    NzAlertComponent,
     DatePipe,
+    JsonPipe,
   ],
 })
 export class ConsoleFrameComponent implements OnInit, OnChanges {
@@ -92,6 +110,7 @@ export class ConsoleFrameComponent implements OnInit, OnChanges {
 
   // display print
   consoleMessages: ReadonlyArray<ConsoleMessage> = [];
+  fixState?: FixState;
 
   // Configuration Menu items
   // TODO: move Configuration Menu to a separate component
@@ -115,6 +134,8 @@ export class ConsoleFrameComponent implements OnInit, OnChanges {
     private executeWorkflowService: ExecuteWorkflowService,
     private workflowConsoleService: WorkflowConsoleService,
     private workflowWebsocketService: WorkflowWebsocketService,
+    private workflowActionService: WorkflowActionService,
+    private http: HttpClient,
     private notificationService: NotificationService,
     private udfDebugService: UdfDebugService
   ) {}
@@ -164,6 +185,9 @@ export class ConsoleFrameComponent implements OnInit, OnChanges {
 
   displayConsoleMessages(operatorId: string): void {
     this.consoleMessages = operatorId ? this.workflowConsoleService.getConsoleMessages(operatorId) || [] : [];
+    if (!this.latestConsoleError()) {
+      this.fixState = undefined;
+    }
     setTimeout(() => {
       if (this.listElement) {
         this.listElement.nativeElement.scrollTop = this.listElement.nativeElement.scrollHeight;
@@ -243,5 +267,61 @@ export class ConsoleFrameComponent implements OnInit, OnChanges {
 
   getMessageLabel(message: ConsoleMessage): string {
     return this.labelMapping.get(message.msgType.name) ?? "";
+  }
+
+  latestConsoleError(): ConsoleMessage | undefined {
+    return [...this.consoleMessages]
+      .reverse()
+      .find(entry => entry.msgType.name === "ERROR" || entry.title.length > 0 || entry.message.length > 0);
+  }
+
+  fixConsoleErrorWithAI(): void {
+    const consoleError = this.latestConsoleError();
+    if (!consoleError || !this.operatorId) {
+      return;
+    }
+
+    let operator;
+    try {
+      operator = this.workflowActionService.getTexeraGraph().getOperator(this.operatorId);
+    } catch {
+      this.notificationService.error("Cannot find operator to fix.");
+      return;
+    }
+
+    this.fixState = { loading: true };
+    this.http
+      .post<FixResult>("/api/fix-operator", {
+        error: `${consoleError.title}\n${consoleError.message}`,
+        operatorType: operator.operatorType,
+        operatorProperties: operator.operatorProperties,
+      })
+      .subscribe({
+        next: result => {
+          this.fixState = { loading: false, result };
+        },
+        error: err => {
+          this.fixState = { loading: false, error: err.message ?? "Failed to get fix suggestion." };
+        },
+      });
+  }
+
+  applyConsoleFix(): void {
+    if (!this.fixState?.result?.fix || !this.operatorId) {
+      return;
+    }
+
+    let operator;
+    try {
+      operator = this.workflowActionService.getTexeraGraph().getOperator(this.operatorId);
+    } catch {
+      this.notificationService.error("Cannot find operator to apply fix.");
+      return;
+    }
+
+    const updatedProperties = { ...operator.operatorProperties, ...this.fixState.result.fix };
+    this.workflowActionService.setOperatorProperty(this.operatorId, updatedProperties);
+    this.notificationService.success("Fix applied. Re-run the workflow to verify.");
+    this.fixState = undefined;
   }
 }
